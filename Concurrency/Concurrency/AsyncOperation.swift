@@ -30,27 +30,39 @@ import Foundation
 
 /// You should never directly use this class. Always subclass it.
 class AsyncOperation: Operation {
-  // Create state management
-  var state = State.ready {
-    willSet {
-      willChangeValue(forKey: newValue.keyPath)
-      willChangeValue(forKey: state.keyPath)
+  
+  private var _state: State = .isReady
+  private let stateQueue = DispatchQueue(label: "com.SamanthaGatt.Concurrency.ConcurrentOperationStateQueue")
+  
+  // Creates thread safe state management
+  var state: State {
+    get {
+      var result: State?
+      stateQueue.sync { result = _state }
+      // Should never be nil but I don't like force unwrapping
+      return result ?? .isFinished
     }
-    didSet {
-      didChangeValue(forKey: oldValue.keyPath)
-      didChangeValue(forKey: state.keyPath)
+    set {
+      let oldValue = state
+      willChangeValue(forKey: newValue.rawValue)
+      willChangeValue(forKey: oldValue.rawValue)
+      
+      stateQueue.sync { _state = newValue }
+      
+      didChangeValue(forKey: oldValue.rawValue)
+      didChangeValue(forKey: newValue.rawValue)
     }
   }
 
   // Make sure to check the base class isReady since it handles scheduling for you
   override var isReady: Bool {
-    return super.isReady && state == .ready
+    return super.isReady && state == .isReady
   }
   override var isExecuting: Bool {
-    return state == .executing
+    return state == .isExecuting
   }
   override var isFinished: Bool {
-    return state == .finished
+    return state == .isFinished
   }
   
   override var isAsynchronous: Bool {
@@ -60,20 +72,16 @@ class AsyncOperation: Operation {
   // Must not call super.start()
   override func start() {
     if isCancelled {
-      state = .finished
+      state = .isFinished
       return
     }
     main()
-    state = .executing
+    state = .isExecuting
   }
 }
 
 extension AsyncOperation {
   enum State: String {
-    case ready, executing, finished
-
-    fileprivate var keyPath: String {
-      return "is\(rawValue.capitalized)"
-    }
+    case isReady, isExecuting, isFinished
   }
 }

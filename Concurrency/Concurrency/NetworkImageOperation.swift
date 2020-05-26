@@ -48,7 +48,7 @@ final class NetworkImageOperation: AsyncOperation, ImageDataProvider {
   override func main() {
     task = URLSession.shared.dataTask(with: url) { [weak self] data, res, err in
       guard let self = self else { return }
-      defer { self.state = .finished }
+      defer { self.state = .isFinished }
       guard let completion = self.completion else {
         guard err == nil, let data = data else { return }
         self.image = UIImage(data: data)
